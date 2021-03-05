@@ -1,0 +1,215 @@
+// Global variables
+
+var canvas, context;
+var frames = 24;
+var frameTime = 1000 / frames;
+var rects = []; // contains the rectangles for the rain
+var base;       // the main rectangle for ground
+var baseY;      // Y coordinate of base
+var mountains = []; 
+var ground = [];    // contains objects on the base
+
+// Main function
+
+function UpdateCanvas(){
+    canvas = document.getElementById("myCanvas");
+    context = canvas.getContext("2d");
+    Init(); // initialize scene
+    setInterval(NextFrame, frameTime); // infinity loop for animation
+}
+
+// Basic shapes definition
+
+class Rectangle{
+    constructor(positionX, positionY, Width, Height, color = "black", xaxis = 0, yaxis = 0){
+        this.Color = color;
+        this.x = positionX;
+        this.y = positionY;
+        this.width = Width;
+        this.height = Height;
+        this.xaxis = xaxis;
+        this.yaxis = yaxis;
+    }
+    
+    UpdatePosition(x, y){
+        this.x += x;
+        this.y += y;
+    }
+
+    Display() { // displays given shape
+        context.save(); // required whenever I modify context to restore previous context
+            context.transform(this.width,0,0,this.height,this.x,this.y);    // modifies context
+            context.transform(1,this.xaxis,this.yaxis,1,0,0);
+            context.fillStyle = this.Color; // change fill color
+            context.fillRect(0,0,1,1); // fill rect 1x1 px
+        context.restore(); // restore saved context
+    }
+}
+
+class Circle {
+    constructor(radius, rX, rY,angle = 0, color="black" ,xaxis,yaxis) {
+        this.R = radius;
+        this.Color = color;
+        this.X = rX;
+        this.Y = rY;
+        this.angle = angle;
+        this.A = Math.floor( Math.random() * 360 );
+        this.xaxis = xaxis;
+        this.yaxis = yaxis;
+    }
+    Display() {
+        context.save()
+            context.transform(this.R,0,0,this.R,this.X, this.Y);
+            context.transform(1,this.xaxis,this.yaxis,1,0,0);
+            context.fillStyle = this.Color;
+            context.beginPath();
+                context.arc(0, 0, 1, 0, Math.PI * 2, true);
+            context.closePath();
+            context.fill(); // fiil to fill circle with color, stroke() for arc
+        context.restore();
+    }
+    Rotate(){
+        this.angle += 10;
+        this.angle %= 360;
+        var sinA = Math.sin( ( this.angle + this.A ) * Math.PI / 180.0 * 10/this.R);
+        var cosA = Math.cos( ( this.angle + this.A ) * Math.PI / 180.0 * 10/this.R);
+        context.save();
+            context.transform( cosA, sinA, -sinA, cosA, this.X, this.Y );
+            setTimeout(this.Display,1);
+        context.restore();
+    }
+};
+
+// Advanced shape definition
+
+class Lightning{
+    constructor(x,y, color = "white", height = canvas.height/2){
+        this.parts = [];
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.height = height -Math.floor((Math.random() * 50) + 10);
+    }
+
+    UpdatePosition(x,y){
+        this.x = x;
+        this.y = y;
+    }
+
+    Init(){
+        var thickness = 10;
+        var n = Math.floor((Math.random() * 3) + 3);
+        var h = this.height;
+        var angles = [];
+        for(var i = 0;i<n;i++){ 
+            var temp = (Math.floor((Math.random() * 90) + 30)/100);
+            temp *= Math.floor(Math.random() * 2)==1 ? 1 : -1;
+            angles.push(temp);
+        }
+        for(var i = 0; i<n; i++){
+            if(i == 0){
+                var temp = new Rectangle(this.x, this.y,thickness,h,this.color,0,angles[i]*10);
+             }else{
+                var tempH = h/2;// + Math.floor((Math.random() * 20) + 10);
+                var temp = new Rectangle(this.parts[i-1].x+(angles[i-1]*100), this.parts[i-1].y+h,thickness,tempH,this.color,0,angles[i]*10);
+                h = tempH;
+            }
+            this.parts.push(temp);
+            if(Math.floor(Math.random() * 2)==1 && i > 0){
+                var temp = new Rectangle(this.parts[i-1].x+(angles[i-1]*100), this.parts[i-1].y+(h*2),thickness,tempH-Math.floor(Math.random() * 20),this.color,0,-angles[i]*10);
+                this.parts.push(temp);
+            } 
+        }
+    }
+
+    Display(){
+        for(var i =0;i<this.parts.length;i++){
+                this.parts[i].Display();
+        }
+    }
+}
+
+
+// Scene handling
+
+function Init(){
+    console.log("Init started");
+    var width = canvas.width;
+    var height = canvas.height;
+    // Rain
+    for(var i = -height; i<height; i += Math.floor((Math.random() * 30) + 10)){
+        
+        for(var j = Math.floor((Math.random() * 5) - 2); j<width;){
+            var y = i + Math.floor((Math.random() * 5) - 5);
+            var temp = new Rectangle(j,y,Math.floor((Math.random() * 3) + 1),Math.floor((Math.random() * 15) + 10), "blue")
+            rects.push(temp);
+            j += Math.floor((Math.random() * 30) + 15) ;
+        }
+    }
+    console.log("Rain finished");
+
+    baseY = Math.floor((Math.random() * 50) + (height/2 - (Math.random() * 20)));   // the height of base
+
+    // Mountains
+    for(var j = Math.floor((Math.random() * 40) + 10); j<width; ){
+        var w = Math.floor((Math.random() * 200) + 100); 
+        var temp = new Rectangle(j,baseY-Math.floor((Math.random() * 80) + 20),w,Math.floor((Math.random() * 200) + 100), "brown",(Math.floor((Math.random() * 90) + 30)/100),-(Math.floor((Math.random() * 90) + 30)/100));
+        mountains.push(temp);
+        j += w;
+    }
+
+    // Ground
+    base = new Rectangle(0, baseY, width, height,"green");
+    for(var j = Math.floor((Math.random() * 10)); j<width; ){
+        var radius = Math.floor((Math.random() * 5) + 1); 
+        var temp = new Circle(radius,j,Math.floor((Math.random() * 80) + baseY*1.1),0, "red");
+        ground.push(temp);
+        var temp = new Circle(radius,j,Math.floor((Math.random() * 80) + baseY*1.4),0, "red");
+        ground.push(temp);
+        j += 2*radius;
+    }
+    console.log("Ground finished");
+
+    console.log("Init finished");
+}
+
+function NextFrame(){
+    // Frame refresh
+    context.clearRect(0, 0, canvas.width, canvas.height );
+    // Sky
+    var sky = new Rectangle(0,0,canvas.width,canvas.height,"grey");
+    sky.Display();
+
+    // Update mountains
+    for(var i = 0;i<mountains.length;i++){
+        mountains[i].Display();
+    }
+
+    // Update base
+    base.Display();
+
+    // Update Ground
+    for(var i =0; i<ground.length;i++){
+        ground[i].Display();
+    }
+
+    // Update storm 
+    if(Math.floor((Math.random() * 9) + 1)==1){
+        var temp = new Lightning((Math.floor((Math.random() * canvas.width) + 1)),-(Math.floor((Math.random() * 50) + 1)),"white", baseY/2);
+        temp.Init();
+        temp.Display();
+    }
+    // Update rain
+    for(var i =0; i<rects.length;i++){
+        rects[i].y += rects[i].height;
+        if(rects[i].y>canvas.height-Math.floor((Math.random() * 80) + 1) + rects[i].height){
+            rects[i].y = -Math.floor((Math.random() * 20) + rects[i].height);
+            rects[i].x += Math.floor((Math.random() * 7) - 3);
+        }
+        if(rects[i].x < -2){
+            rects[i].x += -(rects[i].x - 1);
+            rects[i].x += Math.floor((Math.random() * canvas.width) + 100);
+        }
+        rects[i].Display();
+    }
+};
